@@ -22,52 +22,15 @@ BASE_URL = "https://roxanne-fervid-nonstoically.ngrok-free.dev"
 
 
 @app.route("/webhook", methods=["POST"])
+@app.route("/webhook", methods=["POST"])
 def webhook():
-    """Receives WhatsApp messages from students."""
-
-    incoming_message = request.form.get("Body", "").strip()
-    sender_phone = request.form.get("From", "")
-    media_url = request.form.get("MediaUrl0", None)
-
-    print(f"\n📨 New message from {sender_phone}")
-    print(f"📝 Message: {incoming_message}")
+    print("Webhook triggered")
+    print(request.form)
 
     response = MessagingResponse()
-
-    if incoming_message:
-        # Step 1: Classify with ML
-        ai_result = classify_complaint(incoming_message, media_url)
-
-        # Step 2: Save to database
-        saved = save_complaint(sender_phone, incoming_message, ai_result)
-
-        if saved:
-            complaint_id = str(saved["id"])[:8].upper()
-
-            # Step 3: Send email to department
-            print(f"\n📧 Sending email to {saved['department_email']}...")
-            email_sent = send_department_email(saved, BASE_URL)
-
-            if email_sent:
-                print(f"✅ Department notified via email!")
-            else:
-                print(f"⚠️ Email failed but complaint saved.")
-
-            # Step 4: Send acknowledgement to student
-            response.message(
-                f"✅ Complaint Received!\n\n"
-                f"📋 ID: #{complaint_id}\n"
-                f"🏷️ Category: {ai_result.get('category')}\n"
-                f"⚡ Priority: {ai_result.get('priority')}\n"
-                f"🏢 Assigned to: {ai_result.get('department_email')}\n\n"
-                f"You will be notified on WhatsApp once resolved. Thank you!"
-            )
-        else:
-            response.message(
-                "✅ Complaint received! Our team will look into it shortly."
-            )
-
+    response.message("Test reply from Render")
     return str(response)
+
 
 
 @app.route("/resolve", methods=["GET"])
