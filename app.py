@@ -24,48 +24,55 @@ BASE_URL = os.getenv("BASE_URL", "https://hostel-complaint-system-6yj2.onrender.
 @app.route("/webhook", methods=["POST"])
 def webhook():
     """Receives WhatsApp messages from Twilio."""
-    try:
-        incoming_message = request.form.get("Body", "").strip()
-        sender_phone = request.form.get("From", "")
-        media_url = request.form.get("MediaUrl0", None)
 
-        print(f"\n📨 New message from {sender_phone}")
-        print(f"📝 Message: {incoming_message}")
+    incoming_message = request.form.get("Body", "").strip()
+    sender_phone = request.form.get("From", "")
+    media_url = request.form.get("MediaUrl0", None)
 
-        response = MessagingResponse()
+    print(f"\n📨 New message from {sender_phone}")
+    print(f"📝 Message: {incoming_message}")
 
-        if incoming_message:
-            print("🤖 Classifying complaint...")
-            ai_result = classify_complaint(incoming_message, media_url)
-            print(f"   Result: {ai_result}")
+    response = MessagingResponse()
 
-            print("💾 Saving to database...")
-            saved = save_complaint(sender_phone, incoming_message, ai_result)
-            print(f"   Saved: {saved}")
+    if incoming_message:
+        # Step 1: Classify
+        print("🤖 Classifying complaint...")
+        ai_result = classify_complaint(incoming_message, media_url)
+        print(f"   Category: {ai_result['category']}, Priority: {ai_result['priority']}")
 
-            if saved:
-                complaint_id = str(saved["id"])[:8].upper()
-                
-                print(f"📧 Sending email...")
-                email_sent = send_department_email(saved, BASE_URL)
-                print(f"   Email sent: {email_sent}")
+        # Step 2: Save to database
+        print("💾 Saving to database...")
+        saved = save_complaint(sender_phone, incoming_message, ai_result)
 
-                response.message(
-                    f"✅ Complaint Received!\n\n"
-                    f"📋 ID: #{complaint_id}\n"
-                    f"🏷️ Category: {ai_result.get('category')}\n"
-                    f"⚡ Priority: {ai_result.get('priority')}"
-                )
+        if saved:
+            complaint_id = str(saved["id"])[:8].upper()
+            print(f"✅ Saved! ID: {complaint_id}")
+
+            # Step 3: Send email to department
+            print(f"📧 Sending email to {saved['department_email']}...")
+            email_sent = send_department_email(saved, BASE_URL)
+
+            if email_sent:
+                print("✅ Email sent successfully!")
             else:
-                response.message("✅ Complaint received!")
+                print("⚠️ Email failed but complaint is saved")
 
-        return str(response)
-    
-    except Exception as e:
-        print(f"❌❌❌ WEBHOOK ERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        return str(MessagingResponse().message("Error processing complaint")), 200
+            # Step 4: Reply to student
+            response.message(
+                f"✅ Complaint Received!\n\n"
+                f"📋 ID: #{complaint_id}\n"
+                f"🏷️ Category: {ai_result.get('category')}\n"
+                f"⚡ Priority: {ai_result.get('priority')}\n"
+                f"🏢 Assigned to: {ai_result.get('department_email')}\n\n"
+                f"You will be notified on WhatsApp once resolved. Thank you!"
+            )
+        else:
+            print("❌ Failed to save to database")
+            response.message(
+                "✅ Complaint received! Our team will look into it shortly."
+            )
+
+    return str(response)
 
 
 @app.route("/resolve", methods=["GET"])
