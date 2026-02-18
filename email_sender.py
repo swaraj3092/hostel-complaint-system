@@ -33,6 +33,9 @@ def send_department_email(complaint, resolve_base_url):
     Works on both Localhost and Render
     """
 
+    print("GMAIL_USER:", GMAIL_USER)
+    print("GMAIL_APP_PASSWORD exists:", bool(GMAIL_APP_PASSWORD))
+
     try:
         print("📧 Email function started")
 
