@@ -23,13 +23,28 @@ BASE_URL = "https://roxanne-fervid-nonstoically.ngrok-free.dev"
 
 @app.route("/webhook", methods=["POST"])
 @app.route("/webhook", methods=["POST"])
+@app.route("/webhook", methods=["POST"])
 def webhook():
-    print("Webhook triggered")
-    print(request.form)
+    incoming_message = request.form.get("Body", "").strip()
+    sender_phone = request.form.get("From", "")
 
     response = MessagingResponse()
-    response.message("Test reply from Render")
+
+    try:
+        ai_result = classify_complaint(incoming_message)
+        saved = save_complaint(sender_phone, incoming_message, ai_result)
+
+        if saved:
+            response.message("✅ Complaint received successfully!")
+        else:
+            response.message("Complaint received.")
+
+    except Exception as e:
+        print("ERROR:", e)
+        response.message("⚠️ Complaint received, but internal processing failed.")
+
     return str(response)
+
 
 
 
