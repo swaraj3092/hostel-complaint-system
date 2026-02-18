@@ -7,52 +7,86 @@ from database import save_complaint, resolve_complaint, get_complaint_by_token
 from email_sender import send_department_email
 import os
 
+# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
 
-# Twilio client for sending WhatsApp replies
-twilio_client = Client(
-    os.getenv("TWILIO_ACCOUNT_SID"),
-    os.getenv("TWILIO_AUTH_TOKEN")
-)
+# Environment Variables
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER")
+BASE_URL = os.getenv("BASE_URL")
 
-# ⚠️ Update this every time ngrok restarts!
-BASE_URL = "https://roxanne-fervid-nonstoically.ngrok-free.dev"
+# Twilio client
+twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 
-@app.route("/webhook", methods=["POST"])
-@app.route("/webhook", methods=["POST"])
+# ================================
+# WHATSAPP WEBHOOK
+# ================================
 @app.route("/webhook", methods=["POST"])
 def webhook():
     incoming_message = request.form.get("Body", "").strip()
     sender_phone = request.form.get("From", "")
 
+    print("\n📨 New WhatsApp message received")
+    print("Message:", incoming_message)
+    print("From:", sender_phone)
+
     response = MessagingResponse()
 
     try:
+        if not incoming_message:
+            response.message("⚠️ Please send a valid complaint message.")
+            return str(response)
+
+        # Step 1: Classify complaint
+        print("Step 1: Classifying complaint...")
         ai_result = classify_complaint(incoming_message)
+
+        print("AI Result:", ai_result)
+
+        # Step 2: Save complaint
+        print("Step 2: Saving complaint to database...")
         saved = save_complaint(sender_phone, incoming_message, ai_result)
 
+        print("Saved complaint:", saved)
+
         if saved:
-            response.message("✅ Complaint received successfully!")
+            complaint_id = str(saved["id"])[:8].upper()
+
+            # Step 3: Send department email
+            print("Step 3: Sending department email...")
+            email_sent = send_department_email(saved, BASE_URL)
+            print("Email sent result:", email_sent)
+
+            # Step 4: Send WhatsApp acknowledgement
+            response.message(
+                f"✅ Complaint Received!\n\n"
+                f"📋 ID: #{complaint_id}\n"
+                f"🏷️ Category: {saved.get('category')}\n"
+                f"⚡ Priority: {saved.get('priority')}\n"
+                f"🏢 Assigned to: {saved.get('department_email')}\n\n"
+                f"Our team has been notified."
+            )
         else:
-            response.message("Complaint received.")
+            response.message("⚠️ Complaint received but saving failed.")
 
     except Exception as e:
-        print("ERROR:", e)
-        response.message("⚠️ Complaint received, but internal processing failed.")
+        print("❌ ERROR in webhook:", str(e))
+        response.message("⚠️ Complaint received but processing failed.")
 
     return str(response)
 
 
-
-
+# ================================
+# RESOLVE ENDPOINT
+# ================================
 @app.route("/resolve", methods=["GET"])
 def resolve():
-    """Department clicks this link in email to resolve complaint."""
     token = request.args.get("token")
-    note = request.args.get("note", "Issue has been resolved.")
+    note = request.args.get("note", "Issue resolved.")
 
     if not token:
         return "❌ Invalid link.", 400
@@ -63,62 +97,61 @@ def resolve():
         return "❌ Complaint not found.", 404
 
     if complaint["status"] == "RESOLVED":
-        return "✅ This complaint was already resolved.", 200
+        return "✅ Already resolved.", 200
 
-    # Mark as resolved in database
     updated = resolve_complaint(token, note)
 
     if updated:
-        # Send WhatsApp notification to student
+        # Notify student via WhatsApp
         try:
             twilio_client.messages.create(
-                from_=os.getenv("TWILIO_WHATSAPP_NUMBER"),
+                from_=TWILIO_WHATSAPP_NUMBER,
                 to=complaint["student_phone"],
                 body=(
                     f"✅ Great news!\n\n"
                     f"Your complaint #{str(complaint['id'])[:8].upper()} has been resolved!\n\n"
-                    f"🏷️ Issue: {complaint.get('summary', complaint.get('category'))}\n"
+                    f"🏷️ Issue: {complaint.get('category')}\n"
                     f"🏢 Resolved by: {complaint.get('department_email')}\n\n"
                     f"Thank you for reporting. — Hostel Management"
                 )
             )
-            print(f"📲 WhatsApp notification sent to {complaint['student_phone']}")
+            print("📲 Student notified via WhatsApp")
         except Exception as e:
-            print(f"⚠️ WhatsApp notify failed: {e}")
+            print("⚠️ WhatsApp notify failed:", str(e))
 
-        return f"""
+        return """
         <html>
-        <body style="font-family: Arial; text-align: center; padding: 50px; background: #f0fdf4;">
-            <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-                <div style="font-size: 60px;">✅</div>
-                <h1 style="color: #16a34a;">Complaint Resolved!</h1>
-                <p style="color: #64748b;">The student has been notified via WhatsApp.</p>
-                <hr style="border: 1px solid #e2e8f0; margin: 20px 0;">
-                <p><b>Category:</b> {complaint['category']}</p>
-                <p><b>Student:</b> {complaint['student_phone']}</p>
-                <p><b>Issue:</b> {complaint.get('summary', '')}</p>
-            </div>
+        <body style="font-family: Arial; text-align: center; padding: 50px;">
+            <h1 style="color: green;">✅ Complaint Resolved!</h1>
+            <p>The student has been notified.</p>
         </body>
         </html>
-        """, 200
+        """
 
     return "❌ Something went wrong.", 500
 
 
+# ================================
+# ADMIN VIEW ALL COMPLAINTS
+# ================================
 @app.route("/complaints", methods=["GET"])
 def view_complaints():
-    """View all complaints — admin use."""
     from database import get_all_complaints
     complaints = get_all_complaints()
     return jsonify(complaints), 200
 
 
+# ================================
+# HOME ROUTE
+# ================================
 @app.route("/", methods=["GET"])
 def home():
     return "🏠 Hostel Complaint System is running!", 200
 
 
+# ================================
+# RENDER DEPLOYMENT
+# ================================
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port,debug=True)
+    app.run(host="0.0.0.0", port=port)
