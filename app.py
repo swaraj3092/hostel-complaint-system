@@ -30,12 +30,48 @@ BAASE_URL = os.getenv("BASE_URL")
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    print("Webhook triggered")
-    print(request.form)
+    incoming_message = request.form.get("Body", "").strip()
+    sender_phone = request.form.get("From", "")
+    media_url = request.form.get("MediaUrl0", None)
+
+    print("\n📨 Webhook triggered")
+    print("Message:", incoming_message)
+    print("From:", sender_phone)
 
     response = MessagingResponse()
-    response.message("✅ Server is working!")
+
+    try:
+        if not incoming_message:
+            response.message("⚠️ Please send a valid complaint.")
+            return str(response)
+
+        # Always reply immediately (IMPORTANT)
+        response.message("✅ Complaint received. Processing...")
+
+        # Do heavy processing after reply is prepared
+        try:
+            print("Step 1: Classifying...")
+            ai_result = classify_complaint(incoming_message, media_url)
+
+            print("Step 2: Saving...")
+            saved = save_complaint(sender_phone, incoming_message, ai_result)
+
+            print("Saved:", saved)
+
+            if saved:
+                print("Step 3: Sending email...")
+                send_department_email(saved, os.getenv("BASE_URL"))
+                print("Email attempt completed")
+
+        except Exception as internal_error:
+            print("❌ Internal processing error:", internal_error)
+
+    except Exception as e:
+        print("❌ Webhook error:", e)
+        response.message("⚠️ System error occurred.")
+
     return str(response)
+
 
 
 
