@@ -30,69 +30,13 @@ BAASE_URL = os.getenv("BASE_URL")
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    """Receives WhatsApp messages from students."""
-
-    incoming_message = request.form.get("Body", "").strip()
-    sender_phone = request.form.get("From", "")
-    media_url = request.form.get("MediaUrl0", None)
-
-    print(f"\n📨 New message from {sender_phone}")
-    print(f"📝 Message: {incoming_message}")
+    print("Webhook triggered")
+    print(request.form)
 
     response = MessagingResponse()
-
-    try:
-        if incoming_message:
-
-            # Step 1: Classify with ML
-            print("Step 1: Classifying complaint...")
-            ai_result = classify_complaint(incoming_message, media_url)
-            print("AI Result:", ai_result)
-
-            # Step 2: Save to database
-            print("Step 2: Saving complaint...")
-            saved = save_complaint(sender_phone, incoming_message, ai_result)
-            print("Saved complaint:", saved)
-
-            if saved:
-                complaint_id = str(saved["id"])[:8].upper()
-
-                # Step 3: Send email to department
-                try:
-                    print(f"\n📧 Sending email to {saved.get('department_email')}...")
-                    
-                    email_sent = send_department_email(saved, BASE_URL)
-
-                    if email_sent:
-                        print("✅ Department notified via email!")
-                    else:
-                        print("⚠️ Email sending failed.")
-
-                except Exception as email_error:
-                    print("❌ Email error:", email_error)
-
-                # Step 4: Send acknowledgement to student
-                response.message(
-                    f"✅ Complaint Received!\n\n"
-                    f"📋 ID: #{complaint_id}\n"
-                    f"🏷️ Category: {ai_result.get('category')}\n"
-                    f"⚡ Priority: {ai_result.get('priority')}\n"
-                    f"🏢 Assigned to: {ai_result.get('department_email')}\n\n"
-                    f"You will be notified on WhatsApp once resolved."
-                )
-
-            else:
-                response.message(
-                    "⚠️ Complaint received but saving failed."
-                )
-
-    except Exception as e:
-        print("❌ Webhook error:", e)
-        response.message(
-            "⚠️ Complaint received but processing failed."
-        )
-
+    response.message("✅ Server is working!")
     return str(response)
+
 
 
 # ================================
