@@ -24,64 +24,48 @@ BASE_URL = os.getenv("BASE_URL", "https://hostel-complaint-system-6yj2.onrender.
 @app.route("/webhook", methods=["POST"])
 def webhook():
     """Receives WhatsApp messages from Twilio."""
-    
-    print("=" * 60)
-    print("🚀 WEBHOOK CALLED!")
-    print("=" * 60)
-    
     try:
         incoming_message = request.form.get("Body", "").strip()
         sender_phone = request.form.get("From", "")
         media_url = request.form.get("MediaUrl0", None)
 
-        print(f"📨 Sender: {sender_phone}")
+        print(f"\n📨 New message from {sender_phone}")
         print(f"📝 Message: {incoming_message}")
 
         response = MessagingResponse()
 
         if incoming_message:
-            print("Step 1: Starting classification...")
+            print("🤖 Classifying complaint...")
             ai_result = classify_complaint(incoming_message, media_url)
-            print(f"Step 1 DONE: {ai_result}")
+            print(f"   Result: {ai_result}")
 
-            print("Step 2: Saving to database...")
+            print("💾 Saving to database...")
             saved = save_complaint(sender_phone, incoming_message, ai_result)
-            print(f"Step 2 DONE: Saved={bool(saved)}")
+            print(f"   Saved: {saved}")
 
             if saved:
                 complaint_id = str(saved["id"])[:8].upper()
                 
-                print("Step 3: Sending email...")
+                print(f"📧 Sending email...")
                 email_sent = send_department_email(saved, BASE_URL)
-                print(f"Step 3 DONE: Email sent={email_sent}")
+                print(f"   Email sent: {email_sent}")
 
-                print("Step 4: Creating WhatsApp response...")
                 response.message(
                     f"✅ Complaint Received!\n\n"
                     f"📋 ID: #{complaint_id}\n"
                     f"🏷️ Category: {ai_result.get('category')}\n"
-                    f"⚡ Priority: {ai_result.get('priority')}\n"
-                    f"🏢 Assigned to: {ai_result.get('department_email')}\n\n"
-                    f"You will be notified once resolved!"
+                    f"⚡ Priority: {ai_result.get('priority')}"
                 )
-                print("Step 4 DONE: Response created")
             else:
-                print("Database save FAILED")
                 response.message("✅ Complaint received!")
 
-        print("✅ WEBHOOK COMPLETE")
         return str(response)
     
     except Exception as e:
-        print("=" * 60)
-        print(f"❌ ERROR IN WEBHOOK: {e}")
-        print("=" * 60)
+        print(f"❌❌❌ WEBHOOK ERROR: {e}")
         import traceback
         traceback.print_exc()
-        
-        resp = MessagingResponse()
-        resp.message("System error - complaint logged manually")
-        return str(resp), 200
+        return str(MessagingResponse().message("Error processing complaint")), 200
 
 
 @app.route("/resolve", methods=["GET"])
