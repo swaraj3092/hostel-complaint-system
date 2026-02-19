@@ -166,16 +166,16 @@ def send_department_email(complaint, resolve_base_url):
         print("📧 Connecting to Gmail SMTP server (smtp.gmail.com:465)...")
         
         # Send via Gmail SMTP
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as server:
-            print("📧 Connected! Logging in...")
-            server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-            
-            print("📧 Logged in! Sending email...")
-            server.sendmail(
-                GMAIL_USER,
-                complaint.get("department_email"),
-                msg.as_string()
-            )
+        server = smtplib.SMTP("smtp.gmail.com", 587, timeout=30)
+        server.starttls()
+        server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+        server.sendmail(
+            GMAIL_USER,
+            complaint.get("department_email"),
+            msg.as_string()
+        )
+        server.quit()
+
         
         print("=" * 60)
         print(f"✅ EMAIL SENT SUCCESSFULLY to {complaint.get('department_email')}")
