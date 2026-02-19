@@ -7,7 +7,13 @@ from database import save_complaint, resolve_complaint, get_complaint_by_token
 from email_sender import send_department_email
 import os
 
+from dotenv import load_dotenv
+
 load_dotenv()
+
+print("=" * 60)
+print("🚀 APP.PY IS LOADING!")
+print("=" * 60)
 
 app = Flask(__name__)
 
