@@ -5,3 +5,4 @@ supabase
 sendgrid
 python-dotenv
 requests
+resend
