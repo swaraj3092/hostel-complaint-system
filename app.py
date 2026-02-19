@@ -24,34 +24,44 @@ BASE_URL = os.getenv("BASE_URL", "https://hostel-complaint-system-6yj2.onrender.
 @app.route("/webhook", methods=["POST"])
 def webhook():
     """Receives WhatsApp messages from Twilio."""
-
+    print("1")
     incoming_message = request.form.get("Body", "").strip()
+    print("2")
     sender_phone = request.form.get("From", "")
+    print("3")
     media_url = request.form.get("MediaUrl0", None)
-
+    print("4")
     print(f"\n📨 New message from {sender_phone}")
+    print("5")
     print(f"📝 Message: {incoming_message}")
+    print("6")
 
     response = MessagingResponse()
-
+    print("7")
     if incoming_message:
         # Step 1: Classify
+        print("8")
         print("🤖 Classifying complaint...")
+        print("9")
         ai_result = classify_complaint(incoming_message, media_url)
+        print("10")
         print(f"   Category: {ai_result['category']}, Priority: {ai_result['priority']}")
-
+        print("11")
         # Step 2: Save to database
         print("💾 Saving to database...")
         saved = save_complaint(sender_phone, incoming_message, ai_result)
-
+        print("12")
         if saved:
             complaint_id = str(saved["id"])[:8].upper()
+            print("13")
             print(f"✅ Saved! ID: {complaint_id}")
+            print("14")
 
             # Step 3: Send email to department
             print(f"📧 Sending email to {saved['department_email']}...")
+            print("15")
             email_sent = send_department_email(saved, BASE_URL)
-
+            print("16")
             if email_sent:
                 print("✅ Email sent successfully!")
             else:
