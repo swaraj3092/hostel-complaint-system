@@ -20,6 +20,10 @@ twilio_client = Client(
 # Base URL for email links
 BASE_URL = os.getenv("BASE_URL", "https://hostel-complaint-system-6yj2.onrender.com")
 
+@app.route("/test", methods=["GET"])
+def test():
+    print("🧪 TEST ROUTE CALLED!")
+    return "Test successful!", 200
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
