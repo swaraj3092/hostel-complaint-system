@@ -36,11 +36,20 @@ def send_department_email(complaint, resolve_base_url):
     
     Args:
         complaint: The saved complaint record from database
-        resolve_base_url: Base URL of your server (ngrok URL)
+        resolve_base_url: Base URL of your server
     """
+    
+    print("=" * 60)
+    print("📧 EMAIL FUNCTION STARTED")
+    print(f"   To: {complaint.get('department_email')}")
+    print(f"   Gmail User: {GMAIL_USER}")
+    print(f"   Password Set: {bool(GMAIL_APP_PASSWORD)}")
+    print("=" * 60)
+    
     try:
         # Build the resolve link
         resolve_link = f"{resolve_base_url}/resolve?token={complaint['resolve_token']}"
+        print(f"📧 Resolve link: {resolve_link}")
         
         # Get styling
         priority = complaint.get("priority", "MEDIUM")
@@ -50,6 +59,8 @@ def send_department_email(complaint, resolve_base_url):
         
         # Short complaint ID for display
         complaint_id = str(complaint["id"])[:8].upper()
+        
+        print(f"📧 Building HTML email for complaint #{complaint_id}")
         
         # Build HTML email
         html_content = f"""
@@ -141,6 +152,8 @@ def send_department_email(complaint, resolve_base_url):
         </html>
         """
         
+        print("📧 Creating email message object...")
+        
         # Set up the email
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"[{priority}] {category_icon} New Hostel Complaint #{complaint_id} — {category}"
@@ -150,47 +163,44 @@ def send_department_email(complaint, resolve_base_url):
         # Attach HTML content
         msg.attach(MIMEText(html_content, "html"))
         
+        print("📧 Connecting to Gmail SMTP server (smtp.gmail.com:465)...")
+        
         # Send via Gmail SMTP
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as server:
+            print("📧 Connected! Logging in...")
             server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+            
+            print("📧 Logged in! Sending email...")
             server.sendmail(
                 GMAIL_USER,
                 complaint.get("department_email"),
                 msg.as_string()
             )
         
-        print(f"✅ Email sent to {complaint.get('department_email')}")
+        print("=" * 60)
+        print(f"✅ EMAIL SENT SUCCESSFULLY to {complaint.get('department_email')}")
+        print("=" * 60)
         return True
         
-    except Exception as e:
-        print(f"❌ Email error: {e}")
+    except smtplib.SMTPAuthenticationError as e:
+        print("=" * 60)
+        print(f"❌ GMAIL LOGIN FAILED!")
+        print(f"   Error: {e}")
+        print(f"   Check your GMAIL_USER and GMAIL_APP_PASSWORD in Render")
+        print("=" * 60)
         return False
-
-
-# Test function
-if __name__ == "__main__":
-    # Test with a fake complaint
-    test_complaint = {
-        "id": "test-1234-5678-abcd",
-        "student_phone": "whatsapp:+919178773834",
-        "hostel_name": "Block A",
-        "room_number": "204",
-        "category": "PLUMBING",
-        "priority": "HIGH",
-        "raw_message": "The bathroom tap is leaking in Block A Room 204",
-        "summary": "Leaking bathroom tap",
-        "department_email": "your-own-email@gmail.com",  # Send test to yourself
-        "confidence": 89.5,
-        "resolve_token": "test-token-abc123"
-    }
-    
-    print("📧 Sending test email...")
-    result = send_department_email(
-        test_complaint,
-        resolve_base_url="https://roxanne-fervid-nonstoically.ngrok-free.dev"
-    )
-    
-    if result:
-        print("✅ Test email sent! Check your inbox.")
-    else:
-        print("❌ Email failed. Check your Gmail credentials.")
+        
+    except smtplib.SMTPException as e:
+        print("=" * 60)
+        print(f"❌ SMTP ERROR!")
+        print(f"   Error: {e}")
+        print("=" * 60)
+        return False
+        
+    except Exception as e:
+        print("=" * 60)
+        print(f"❌ EMAIL ERROR: {e}")
+        print("=" * 60)
+        import traceback
+        traceback.print_exc()
+        return False
