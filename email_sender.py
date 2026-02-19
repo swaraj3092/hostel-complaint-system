@@ -138,7 +138,7 @@ def send_department_email(complaint, resolve_base_url):
         print("📧 Sending email via Resend API...")
 
         params = {
-            "from": f"Hostel Complaint System <{GMAIL_USER}>",
+            "from": "Hostel Complaint System <onboarding@resend.dev>",
             "to": [complaint.get("department_email")],
             "subject": f"[{priority}] {category_icon} New Complaint #{complaint_id}",
             "html": html_content,
