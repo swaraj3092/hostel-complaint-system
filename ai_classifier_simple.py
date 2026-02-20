@@ -9,14 +9,14 @@ load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 DEPARTMENT_EMAILS = {
-    "PLUMBING": "plumbing@university.edu",
-    "ELECTRICAL": "electrical@university.edu",
-    "CLEANLINESS": "housekeeping@university.edu",
-    "SECURITY": "security@university.edu",
-    "WIFI": "it@university.edu",
-    "FOOD": "mess@university.edu",
-    "FURNITURE": "warden@university.edu",
-    "OTHER": "admin@university.edu"
+    "PLUMBING": "swarajbehera7013@gmail.com",
+    "ELECTRICAL": "swarajbehera7013@gmail.com",
+    "CLEANLINESS": "swarajbehera7013@gmail.com",
+    "SECURITY": "swarajbehera7013@gmail.com",
+    "WIFI": "swarajbehera7013@gmail.com",
+    "FOOD": "swarajbehera7013@gmail.com",
+    "FURNITURE": "swarajbehera7013@gmail.com",
+    "OTHER": "swarajbehera7013@gmail.com"
 }
 
 
