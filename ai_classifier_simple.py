@@ -1,103 +1,112 @@
-import os
-import json
-from dotenv import load_dotenv
-from groq import Groq
-
-load_dotenv()
-
-# Initialize Groq client
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+import re
 
 DEPARTMENT_EMAILS = {
-    "PLUMBING": "swarajbehera7013@gmail.com",
-    "ELECTRICAL": "swarajbehera7013@gmail.com",
-    "CLEANLINESS": "swarajbehera7013@gmail.com",
-    "SECURITY": "swarajbehera7013@gmail.com",
-    "WIFI": "swarajbehera7013@gmail.com",
-    "FOOD": "swarajbehera7013@gmail.com",
-    "FURNITURE": "swarajbehera7013@gmail.com",
-    "OTHER": "swarajbehera7013@gmail.com"
+    "PLUMBING": "swarajbehera923@gmail.com",
+    "ELECTRICAL": "swarajbehera923@gmail.com",
+    "CLEANLINESS": "swarajbehera923@gmail.com",
+    "SECURITY": "swarajbehera923@gmail.com",
+    "WIFI": "swarajbehera923@gmail.com",
+    "FOOD": "swarajbehera923@gmail.com",
+    "FURNITURE": "swarajbehera923@gmail.com",
+    "OTHER": "swarajbehera923@gmail.com"
 }
 
+CATEGORY_KEYWORDS = {
+    "PLUMBING": ["tap", "water", "leak", "pipe", "flush", "toilet", "bathroom", "shower", "drain", "plumb"],
+    "ELECTRICAL": ["light", "electricity", "power", "bulb", "switch", "fan", "ac", "socket"],
+    "CLEANLINESS": ["clean", "dirty", "garbage", "trash", "smell","hygiene", "pest", "insect", "rodent"],
+    "SECURITY": ["security", "lock", "key", "door", "stranger", "theft", "safety", "cctv", "guard", "intruder", "break-in"],
+    "WIFI": ["wifi", "internet", "network", "connection", "slow", "disconnect", "signal", "router", "bandwidth", "latency", "data", "speed", "access", "coverage", "outage", "login", "password", "portal"],
+    "FOOD": ["food", "mess", "meal", "quality", "taste", "hygiene", "menu", "cooking", "vegetarian", "non-vegetarian", "snack", "breakfast", "lunch", "dinner", "bottle", "canteen"],
+    "FURNITURE": ["bed", "chair", "table", "furniture", "sofa", "desk", "cupboard", "drawer", "shelf", "couch", "furnishings", "fixture", "mattress", "wardrobe", "fitting", "cabinet", "stool", "bench", "dining", "furnishing", "upholstery"]
+}
+
+def extract_hostel_name(text):
+    """
+    Extract hostel name from common formats like:
+    KP-7, KP7, Block A, C Block, Kaveri Hostel, etc.
+    """
+
+    text_lower = text.lower()
+
+    patterns = [
+
+        # KP-7, KP7, kp 7
+        r"\b(kp[\s\-]?\d+)\b",
+
+        # Block A, block c
+        r"\b(block[\s\-]?[a-z])\b",
+
+        # C Block, A Block
+        r"\b([a-z][\s\-]?block)\b",
+
+        # Kaveri Hostel, Ganga Hostel
+        r"\b([a-z]+\s+hostel)\b",
+
+        # Hostel KP-7, hostel kp7
+        r"\bhostel[\s\-]?([a-z0-9\-]+)\b"
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text_lower, re.IGNORECASE)
+        if match:
+            hostel = match.group(1).upper().replace(" ", "")
+            return hostel
+
+    return None
+
+def extract_room_number(text):
+    """
+    Extract room number from formats like:
+    room 312
+    rm 101
+    room no 204
+    #312
+    312 (fallback)
+    """
+
+    text_lower = text.lower()
+
+    patterns = [
+
+        # room 312
+        r"\broom[\s\-]?(?:no[\s\-]?)?(\d{2,4})\b",
+
+        # rm 312
+        r"\brm[\s\-]?(\d{2,4})\b",
+
+        # #312
+        r"#(\d{2,4})",
+
+        # fallback: standalone 3-4 digit number
+        r"\b(\d{3,4})\b"
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            return match.group(1)
+
+    return None
+
+def classify_category(text):
+    t = text.lower()
+    scores = {c: sum(1 for k in kws if k in t) for c, kws in CATEGORY_KEYWORDS.items()}
+    return max(scores, key=scores.get) if any(scores.values()) else "OTHER"
+
+def classify_priority(text):
+    t = text.lower()
+    if any(k in t for k in ["urgent", "emergency"]): return "URGENT"
+    if any(k in t for k in ["not working", "broken"]): return "HIGH"
+    return "MEDIUM"
 
 def classify_complaint(message_text, image_url=None):
-
-    prompt = f"""
-You are a hostel complaint classifier.
-
-Extract structured information from this complaint:
-
-MESSAGE: {message_text}
-
-Return ONLY JSON:
-
-{{
-  "hostel_name": string or null,
-  "room_number": string or null,
-  "category": "PLUMBING" | "ELECTRICAL" | "CLEANLINESS" | "SECURITY" | "WIFI" | "FOOD" | "FURNITURE" | "OTHER",
-  "priority": "LOW" | "MEDIUM" | "HIGH" | "URGENT",
-  "summary": string
-}}
-"""
-
-    try:
-
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",  # Best free model
-            temperature=0.2,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You extract structured hostel complaint data."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
-
-        text = response.choices[0].message.content.strip()
-
-        # Remove markdown formatting if present
-        if text.startswith("```"):
-            text = text.replace("```json", "").replace("```", "").strip()
-
-        result = json.loads(text)
-
-        category = result.get("category", "OTHER")
-
-        result["department_email"] = DEPARTMENT_EMAILS.get(
-            category,
-            DEPARTMENT_EMAILS["OTHER"]
-        )
-
-        result["confidence"] = 96.0
-
-        print("✅ Groq classifier working")
-
-        return result
-
-    except Exception as e:
-
-        print("❌ Groq error:", e)
-
-        return {
-            "hostel_name": None,
-            "room_number": None,
-            "category": "OTHER",
-            "priority": "MEDIUM",
-            "summary": message_text[:100],
-            "department_email": DEPARTMENT_EMAILS["OTHER"],
-            "confidence": 0
-        }
-
-
-# Test
-if __name__ == "__main__":
-
-    test_message = "KP-7 hostel room 312 wifi not working urgent"
-
-    result = classify_complaint(test_message)
-
-    print(result)
+    return {
+        "hostel_name": extract_hostel_name(message_text),
+        "room_number": extract_room_number(message_text),
+        "category": classify_category(message_text),
+        "priority": classify_priority(message_text),
+        "summary": message_text[:100],
+        "department_email": DEPARTMENT_EMAILS.get(classify_category(message_text), DEPARTMENT_EMAILS["OTHER"]),
+        "confidence": 85.0
+    }
