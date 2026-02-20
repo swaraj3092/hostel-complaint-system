@@ -34,65 +34,91 @@ def test():
 @app.route("/webhook", methods=["POST"])
 def webhook():
     """Receives WhatsApp messages from Twilio."""
-    print("1")
-    incoming_message = request.form.get("Body", "").strip()
-    print("2")
-    sender_phone = request.form.get("From", "")
-    print("3")
-    media_url = request.form.get("MediaUrl0", None)
-    print("4")
-    print(f"\n📨 New message from {sender_phone}")
-    print("5")
-    print(f"📝 Message: {incoming_message}")
-    print("6")
 
-    response = MessagingResponse()
-    print("7")
-    if incoming_message:
-        # Step 1: Classify
-        print("8")
+    try:
+
+        incoming_message = request.form.get("Body", "").strip()
+        sender_phone = request.form.get("From", "")
+        media_url = request.form.get("MediaUrl0", None)
+
+        print(f"\n📨 New message from {sender_phone}")
+        print(f"📝 Message: {incoming_message}")
+        print(f"📷 Media: {media_url}")
+
+        response = MessagingResponse()
+
+        # Validate message
+        if not incoming_message and not media_url:
+            response.message("Please send a complaint message.")
+            return str(response)
+
+        # Step 1: Classify complaint using Groq
         print("🤖 Classifying complaint...")
-        print("9")
         ai_result = classify_complaint(incoming_message, media_url)
-        print("10")
-        print(f"   Category: {ai_result['category']}, Priority: {ai_result['priority']}")
-        print("11")
+
+        category = ai_result.get("category", "OTHER")
+        priority = ai_result.get("priority", "MEDIUM")
+        department_email = ai_result.get(
+            "department_email",
+            "admin@university.edu"
+        )
+
+        print(f"   Category: {category}, Priority: {priority}")
+
         # Step 2: Save to database
         print("💾 Saving to database...")
-        saved = save_complaint(sender_phone, incoming_message, ai_result)
-        print("12")
+        saved = save_complaint(
+            sender_phone,
+            incoming_message,
+            ai_result
+        )
+
         if saved:
+
             complaint_id = str(saved["id"])[:8].upper()
-            print("13")
             print(f"✅ Saved! ID: {complaint_id}")
-            print("14")
 
             # Step 3: Send email to department
             print(f"📧 Sending email to {saved['department_email']}...")
-            print("15")
+
             email_sent = send_department_email(saved, BASE_URL)
-            print("16")
+
             if email_sent:
                 print("✅ Email sent successfully!")
             else:
                 print("⚠️ Email failed but complaint is saved")
 
-            # Step 4: Reply to student
+            # Step 4: Reply to student via WhatsApp
             response.message(
                 f"✅ Complaint Received!\n\n"
                 f"📋 ID: #{complaint_id}\n"
-                f"🏷️ Category: {ai_result.get('category')}\n"
-                f"⚡ Priority: {ai_result.get('priority')}\n"
-                f"🏢 Assigned to: {ai_result.get('department_email')}\n\n"
-                f"You will be notified on WhatsApp once resolved. Thank you!"
-            )
-        else:
-            print("❌ Failed to save to database")
-            response.message(
-                "✅ Complaint received! Our team will look into it shortly."
+                f"🏷️ Category: {category}\n"
+                f"⚡ Priority: {priority}\n"
+                f"🏢 Assigned to: {department_email}\n\n"
+                f"You will be notified on WhatsApp once resolved.\n"
+                f"Thank you!"
             )
 
-    return str(response)
+        else:
+
+            print("❌ Failed to save to database")
+
+            response.message(
+                "⚠️ Complaint received but could not be saved."
+            )
+
+        return str(response)
+
+    except Exception as e:
+
+        print("❌ Webhook error:", e)
+
+        response = MessagingResponse()
+        response.message(
+            "⚠️ System error occurred. Please try again."
+        )
+
+        return str(response)
 
 
 @app.route("/resolve", methods=["GET"])

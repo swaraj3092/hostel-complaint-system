@@ -1,8 +1,7 @@
 flask
 twilio
-anthropic
 supabase
-sendgrid
 python-dotenv
 requests
 resend
+groq

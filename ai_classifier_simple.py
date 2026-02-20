@@ -1,55 +1,103 @@
-import re
+import os
+import json
+from dotenv import load_dotenv
+from groq import Groq
+
+load_dotenv()
+
+# Initialize Groq client
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 DEPARTMENT_EMAILS = {
-    "PLUMBING": "swarajbehera923@gmail.com",
-    "ELECTRICAL": "swarajbehera923@gmail.com",
-    "CLEANLINESS": "swarajbehera923@gmail.com",
-    "SECURITY": "swarajbehera923@gmail.com",
-    "WIFI": "swarajbehera923@gmail.com",
-    "FOOD": "swarajbehera923@gmail.com",
-    "FURNITURE": "swarajbehera923@gmail.com",
-    "OTHER": "swarajbehera923@gmail.com"
+    "PLUMBING": "plumbing@university.edu",
+    "ELECTRICAL": "electrical@university.edu",
+    "CLEANLINESS": "housekeeping@university.edu",
+    "SECURITY": "security@university.edu",
+    "WIFI": "it@university.edu",
+    "FOOD": "mess@university.edu",
+    "FURNITURE": "warden@university.edu",
+    "OTHER": "admin@university.edu"
 }
 
-CATEGORY_KEYWORDS = {
-    "PLUMBING": ["tap", "water", "leak", "pipe", "flush", "toilet", "bathroom", "shower", "drain"],
-    "ELECTRICAL": ["light", "electricity", "power", "bulb", "switch", "fan", "ac", "socket"],
-    "CLEANLINESS": ["clean", "dirty", "garbage", "trash", "smell"],
-    "SECURITY": ["security", "lock", "key", "door", "stranger", "theft"],
-    "WIFI": ["wifi", "internet", "network", "connection"],
-    "FOOD": ["food", "mess", "meal", "quality"],
-    "FURNITURE": ["bed", "chair", "table", "furniture"]
-}
-
-def extract_hostel_name(text):
-    patterns = [r"(block\s+[a-z])", r"([a-z]+\s+hostel)"]
-    for p in patterns:
-        m = re.search(p, text, re.IGNORECASE)
-        if m: return m.group(1).title()
-    return None
-
-def extract_room_number(text):
-    m = re.search(r"\b(\d{3,4})\b", text)
-    return m.group(1) if m else None
-
-def classify_category(text):
-    t = text.lower()
-    scores = {c: sum(1 for k in kws if k in t) for c, kws in CATEGORY_KEYWORDS.items()}
-    return max(scores, key=scores.get) if any(scores.values()) else "OTHER"
-
-def classify_priority(text):
-    t = text.lower()
-    if any(k in t for k in ["urgent", "emergency"]): return "URGENT"
-    if any(k in t for k in ["not working", "broken"]): return "HIGH"
-    return "MEDIUM"
 
 def classify_complaint(message_text, image_url=None):
-    return {
-        "hostel_name": extract_hostel_name(message_text),
-        "room_number": extract_room_number(message_text),
-        "category": classify_category(message_text),
-        "priority": classify_priority(message_text),
-        "summary": message_text[:100],
-        "department_email": DEPARTMENT_EMAILS.get(classify_category(message_text), DEPARTMENT_EMAILS["OTHER"]),
-        "confidence": 85.0
-    }
+
+    prompt = f"""
+You are a hostel complaint classifier.
+
+Extract structured information from this complaint:
+
+MESSAGE: {message_text}
+
+Return ONLY JSON:
+
+{{
+  "hostel_name": string or null,
+  "room_number": string or null,
+  "category": "PLUMBING" | "ELECTRICAL" | "CLEANLINESS" | "SECURITY" | "WIFI" | "FOOD" | "FURNITURE" | "OTHER",
+  "priority": "LOW" | "MEDIUM" | "HIGH" | "URGENT",
+  "summary": string
+}}
+"""
+
+    try:
+
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",  # Best free model
+            temperature=0.2,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You extract structured hostel complaint data."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+
+        text = response.choices[0].message.content.strip()
+
+        # Remove markdown formatting if present
+        if text.startswith("```"):
+            text = text.replace("```json", "").replace("```", "").strip()
+
+        result = json.loads(text)
+
+        category = result.get("category", "OTHER")
+
+        result["department_email"] = DEPARTMENT_EMAILS.get(
+            category,
+            DEPARTMENT_EMAILS["OTHER"]
+        )
+
+        result["confidence"] = 96.0
+
+        print("✅ Groq classifier working")
+
+        return result
+
+    except Exception as e:
+
+        print("❌ Groq error:", e)
+
+        return {
+            "hostel_name": None,
+            "room_number": None,
+            "category": "OTHER",
+            "priority": "MEDIUM",
+            "summary": message_text[:100],
+            "department_email": DEPARTMENT_EMAILS["OTHER"],
+            "confidence": 0
+        }
+
+
+# Test
+if __name__ == "__main__":
+
+    test_message = "KP-7 hostel room 312 wifi not working urgent"
+
+    result = classify_complaint(test_message)
+
+    print(result)
