@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, send_from_directory
 from flask_cors import CORS
 from twilio.twiml.messaging_response import MessagingResponse
 from dotenv import load_dotenv
@@ -508,6 +508,24 @@ def resolve_complaint():
         import traceback
         traceback.print_exc()
         return f"❌ Error: {str(e)}", 500
+
+
+# Serve React frontend static files
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_react(path):
+    """Serve React frontend."""
+    # Check if path is an API route
+    if path.startswith('api/') or path.startswith('webhook') or path.startswith('resolve'):
+        return jsonify({"error": "Not found"}), 404
+    
+    # Serve static files from React build
+    build_folder = os.path.join(os.path.dirname(__file__), 'frontend', 'build')
+    
+    if path != "" and os.path.exists(os.path.join(build_folder, path)):
+        return send_from_directory(build_folder, path)
+    else:
+        return send_from_directory(build_folder, 'index.html')
 
 
 if __name__ == "__main__":
