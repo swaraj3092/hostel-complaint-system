@@ -93,7 +93,7 @@ After registration, send your complaint again!""")
         }
         
         # Save to database
-        saved_complaint = save_complaint(complaint_data)
+        saved_complaint = create_complaint(complaint_data)
         
         if saved_complaint:
             # Send email to department
