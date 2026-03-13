@@ -1,163 +1,138 @@
 import os
-import resend
+from resend import Resend
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Resend API key
-resend.api_key = os.getenv("RESEND_API_KEY")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+BASE_URL = os.getenv("BASE_URL", "http://localhost:5000")
 
-GMAIL_USER = os.getenv("GMAIL_USER")
-
-
-# Priority colors
-PRIORITY_COLORS = {
-    "URGENT": "#ef4444",
-    "HIGH": "#f97316",
-    "MEDIUM": "#eab308",
-    "LOW": "#22c55e"
-}
-
-CATEGORY_ICONS = {
-    "PLUMBING": "🔧",
-    "ELECTRICAL": "⚡",
-    "CLEANLINESS": "🧹",
-    "SECURITY": "🔒",
-    "WIFI": "📶",
-    "FOOD": "🍽️",
-    "FURNITURE": "🪑",
-    "OTHER": "📋"
-}
+resend = Resend(api_key=RESEND_API_KEY)
 
 
-def send_department_email(complaint, resolve_base_url):
-
-    print("=" * 60)
-    print("📧 EMAIL FUNCTION STARTED")
-    print(f"To: {complaint.get('department_email')}")
-    print("=" * 60)
-
+def send_department_email(complaint):
+    """Send email notification to department with complaint details."""
     try:
-
-        resolve_link = f"{resolve_base_url}/resolve?token={complaint['resolve_token']}"
-
-        priority = complaint.get("priority", "MEDIUM")
-        category = complaint.get("category", "OTHER")
-
-        priority_color = PRIORITY_COLORS.get(priority, "#eab308")
-        category_icon = CATEGORY_ICONS.get(category, "📋")
-
-        complaint_id = str(complaint["id"])[:8].upper()
-
-        # FULL ORIGINAL HTML (UNCHANGED)
+        print("=" * 60)
+        print("📧 EMAIL FUNCTION STARTED")
+        print(f"   To: {complaint.get('department_email')}")
+        
+        # Create resolve link using BASE_URL from environment
+        resolve_link = f"{BASE_URL}/resolve?token={complaint['resolve_token']}"
+        
+        # Priority color coding
+        priority_colors = {
+            "URGENT": "#dc2626",
+            "HIGH": "#ea580c",
+            "MEDIUM": "#f59e0b",
+            "LOW": "#3b82f6"
+        }
+        priority_color = priority_colors.get(complaint.get('priority', 'MEDIUM'), "#f59e0b")
+        
+        # HTML email template
         html_content = f"""
         <!DOCTYPE html>
         <html>
-        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
-            
-            <!-- Header -->
-            <div style="background: #1e293b; color: white; padding: 25px; border-radius: 10px 10px 0 0; text-align: center;">
-                <h1 style="margin: 0; font-size: 22px;">🏠 Hostel Complaint System</h1>
-                <p style="margin: 5px 0 0 0; color: #94a3b8;">New complaint assigned to your department</p>
-            </div>
-            
-            <!-- Priority Banner -->
-            <div style="background: {priority_color}; color: white; padding: 12px; text-align: center;">
-                <strong>⚡ PRIORITY: {priority}</strong>
-            </div>
-            
-            <!-- Complaint Details -->
-            <div style="background: white; padding: 25px;">
-                
-                <h2 style="color: #1e293b;">
-                    {category_icon} {category} Issue — #{complaint_id}
-                </h2>
-                
-                <table style="width: 100%; border-collapse: collapse;">
-                    <tr>
-                        <td><strong>Student Phone</strong></td>
-                        <td>{complaint.get('student_phone')}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>Hostel</strong></td>
-                        <td>{complaint.get('hostel_name', 'Not specified')}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>Room</strong></td>
-                        <td>{complaint.get('room_number', 'Not specified')}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>Category</strong></td>
-                        <td>{category}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>Priority</strong></td>
-                        <td>{priority}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>Confidence</strong></td>
-                        <td>{complaint.get('confidence', 0)}%</td>
-                    </tr>
-
-                </table>
-
-                <br>
-
-                <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
-                    <strong>Student Message:</strong>
-                    <p>{complaint.get('raw_message')}</p>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px; }}
+                .container {{ max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+                .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; color: white; }}
+                .header h1 {{ margin: 0; font-size: 28px; }}
+                .content {{ padding: 30px; }}
+                .priority-badge {{ display: inline-block; background-color: {priority_color}; color: white; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; }}
+                .info-row {{ margin: 15px 0; padding: 12px; background-color: #f9fafb; border-left: 4px solid #667eea; border-radius: 4px; }}
+                .info-label {{ font-weight: bold; color: #4b5563; margin-bottom: 5px; }}
+                .info-value {{ color: #1f2937; font-size: 16px; }}
+                .message-box {{ background-color: #eff6ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 20px 0; }}
+                .resolve-button {{ display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin: 20px 0; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3); }}
+                .resolve-button:hover {{ background: linear-gradient(135deg, #059669 0%, #047857 100%); }}
+                .footer {{ background-color: #f9fafb; padding: 20px; text-align: center; color: #6b7280; font-size: 14px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🏠 New Complaint Received</h1>
+                    <p style="margin: 10px 0 0 0; opacity: 0.9;">Hostel Complaint Management System</p>
                 </div>
-
-                <br>
-
-                <div style="text-align: center;">
-                    <a href="{resolve_link}" 
-                    style="background: #22c55e; color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px;">
-                    ✅ Mark as Resolved
-                    </a>
+                
+                <div class="content">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <span class="priority-badge">⚡ {complaint.get('priority', 'MEDIUM')} PRIORITY</span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <div class="info-label">📋 Complaint ID:</div>
+                        <div class="info-value">#{complaint['resolve_token']}</div>
+                    </div>
+                    
+                    <div class="info-row">
+                        <div class="info-label">👤 Student Name:</div>
+                        <div class="info-value">{complaint.get('student_name', 'N/A')}</div>
+                    </div>
+                    
+                    <div class="info-row">
+                        <div class="info-label">📞 Contact:</div>
+                        <div class="info-value">{complaint.get('student_phone', 'N/A')}</div>
+                    </div>
+                    
+                    <div class="info-row">
+                        <div class="info-label">🏢 Location:</div>
+                        <div class="info-value">{complaint.get('hostel_name', 'N/A')}, Room {complaint.get('room_number', 'N/A')}</div>
+                    </div>
+                    
+                    <div class="info-row">
+                        <div class="info-label">🏷️ Category:</div>
+                        <div class="info-value">{complaint.get('category', 'OTHER')}</div>
+                    </div>
+                    
+                    <div class="message-box">
+                        <div class="info-label">💬 Issue Description:</div>
+                        <div class="info-value" style="margin-top: 10px;">{complaint.get('raw_message', 'No description provided')}</div>
+                    </div>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="{resolve_link}" class="resolve-button">
+                            ✅ Mark as Resolved
+                        </a>
+                    </div>
+                    
+                    <p style="color: #6b7280; font-size: 14px; text-align: center;">
+                        Click the button above once the issue has been fixed. The student will be notified automatically.
+                    </p>
                 </div>
-
+                
+                <div class="footer">
+                    <p style="margin: 5px 0;">Powered by <strong>Fixxo</strong></p>
+                    <p style="margin: 5px 0;">Open Source Hostel Management System</p>
+                </div>
             </div>
-
-            <!-- Footer -->
-            <div style="background: #f1f5f9; padding: 15px; text-align: center;">
-                <p style="font-size: 13px;">
-                Automated email from Hostel Complaint System
-                </p>
-            </div>
-
         </body>
         </html>
         """
-
-        print("📧 Sending email via Resend API...")
-
+        
+        # Send email via Resend
         params = {
-            "from": "Hostel Complaint System <onboarding@resend.dev>",
-            "to": [complaint.get("department_email")],
-            "subject": f"[{priority}] {category_icon} New Complaint #{complaint_id}",
-            "html": html_content,
+            "from": "Fixxo <onboarding@resend.dev>",
+            "to": [complaint['department_email']],
+            "subject": f"[{complaint.get('priority', 'MEDIUM')}] {complaint.get('category', 'NEW')} Issue - {complaint.get('hostel_name', 'Hostel')} Room {complaint.get('room_number', 'N/A')}",
+            "html": html_content
         }
-
-        resend.Emails.send(params)
-
+        
+        email = resend.emails.send(params)
+        
+        print("✅ EMAIL SENT SUCCESSFULLY")
+        print(f"   Email ID: {email.get('id', 'Unknown')}")
         print("=" * 60)
-        print("✅ EMAIL SENT SUCCESSFULLY via Resend")
-        print("=" * 60)
-
+        
         return True
-
+        
     except Exception as e:
-
-        print("=" * 60)
         print(f"❌ EMAIL ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         print("=" * 60)
-
         return False
 
 
@@ -165,7 +140,6 @@ def send_whatsapp_notification(complaint):
     """Send WhatsApp notification to student when complaint is resolved."""
     try:
         from twilio.rest import Client
-        import os
         
         account_sid = os.getenv("TWILIO_ACCOUNT_SID")
         auth_token = os.getenv("TWILIO_AUTH_TOKEN")
