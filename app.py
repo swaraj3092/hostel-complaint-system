@@ -19,7 +19,7 @@ from database import (
     update_complaint_status,
     get_complaint_by_token
 )
-from ai_classifier_simple import classify_complaint
+from ai_classifier import classify_complaint
 from email_sender import send_department_email, send_whatsapp_notification
 
 load_dotenv()
