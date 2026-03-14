@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL || window.location.origin;
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -18,28 +18,34 @@ export default function Register() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Get phone from URL parameter
-    const params = new URLSearchParams(window.location.search);
-    const phone = params.get('phone');
-    
-    console.log('URL phone parameter:', phone); // Debug log
-    
-    if (phone) {
-      // Format phone number correctly
-      let formattedPhone = phone;
-      if (!formattedPhone.startsWith('whatsapp:')) {
-        if (!formattedPhone.startsWith('+')) {
-          formattedPhone = `+${formattedPhone}`;
+    try {
+      // Get phone from URL parameter
+      const params = new URLSearchParams(window.location.search);
+      const phone = params.get('phone');
+      
+      console.log('URL phone parameter:', phone);
+      
+      if (phone) {
+        // Format phone number correctly
+        let formattedPhone = phone;
+        if (!formattedPhone.startsWith('whatsapp:')) {
+          if (!formattedPhone.startsWith('+')) {
+            formattedPhone = `+${formattedPhone}`;
+          }
+          formattedPhone = `whatsapp:${formattedPhone}`;
         }
-        formattedPhone = `whatsapp:${formattedPhone}`;
+        
+        console.log('Formatted phone:', formattedPhone);
+        
+        setFormData(prev => ({ 
+          ...prev, 
+          phone_number: formattedPhone
+        }));
+      } else {
+        console.log('No phone parameter in URL');
       }
-      
-      console.log('Formatted phone:', formattedPhone); // Debug log
-      
-      setFormData(prev => ({ 
-        ...prev, 
-        phone_number: formattedPhone
-      }));
+    } catch (err) {
+      console.error('Error parsing URL:', err);
     }
   }, []);
 
@@ -58,10 +64,10 @@ export default function Register() {
     // Create submission data with auto-generated college_id
     const submitData = {
       ...formData,
-      college_id: `FIXXO${Date.now()}` // Auto-generate unique ID
+      college_id: `FIXXO${Date.now()}`
     };
 
-    console.log('Submitting data:', submitData); // Debug log
+    console.log('Submitting data:', submitData);
 
     try {
       const response = await axios.post(`${API_URL}/api/register`, submitData);
@@ -208,6 +214,7 @@ export default function Register() {
               <option value="Kaveri Hostel">Kaveri Hostel</option>
               <option value="Ganga Hostel">Ganga Hostel</option>
               <option value="Yamuna Hostel">Yamuna Hostel</option>
+              <option value="KP-10B">KP-10B</option>
               <option value="Block A">Block A</option>
               <option value="Block B">Block B</option>
               <option value="Block C">Block C</option>
@@ -263,7 +270,7 @@ export default function Register() {
             </label>
             <input
               type="text"
-              value={formData.phone_number}
+              value={formData.phone_number || 'Not provided - please use registration link from WhatsApp'}
               disabled
               style={{
                 width: '100%',
